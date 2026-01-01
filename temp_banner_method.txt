@@ -1,0 +1,15 @@
+  Widget _buildBannerAd() {
+    final adService = AdService();
+    // Safety check for Web (returns null)
+    final bannerAd = adService.createBannerAd();
+    
+    if (bannerAd == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      height: 60,
+      child: AdWidget(ad: bannerAd),
+    );
+  }

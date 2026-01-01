@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "549075737620",
+    "project_id": "itiraf-f9cc6",
+    "storage_bucket": "itiraf-f9cc6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549075737620:android:c402bee00da9dddbed9b01",
+        "android_client_info": {
+          "package_name": "com.dgn.konubu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC281PSPjf-V8yDdgRbIl7jRz7zX-zUv3k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - İstatistik Düzeltme</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Admin - İstatistik Düzeltme</h1>
+    
+    <div class="warning">
+        <strong>⚠️ UYARI:</strong> Bu işlem TÜM kullanıcıların istatistiklerini yeniden hesaplar. 
+        Bu işlem uzun sürebilir ve sadece bir kez yapılmalıdır.
+    </div>
+
+    <button id="fixButton" onclick="fixAllStats()">Tüm İstatistikleri Düzelt</button>
+
+    <div id="result"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAJQMOTmGxFxNbCLNfKlQWMPkzSMRGZqcI",
+            authDomain: "itiraf-f9cc6.firebaseapp.com",
+            projectId: "itiraf-f9cc6",
+            storageBucket: "itiraf-f9cc6.firebasestorage.app",
+            messagingSenderId: "1062831953831",
+            appId: "1:1062831953831:web:5a0f9e5e0f9e5e0f9e5e0f"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const functions = firebase.functions();
+        functions.useEmulator('localhost', 5001); // Remove this line if not using emulator
+
+        // Set region
+        const functionsRegion = firebase.app().functions('europe-west1');
+
+        async function fixAllStats() {
+            const button = document.getElementById('fixButton');
+            const resultDiv = document.getElementById('result');
+            
+            button.disabled = true;
+            button.textContent = 'İşleniyor...';
+            resultDiv.innerHTML = '';
+
+            try {
+                // Call the Cloud Function
+                const recalculateAllUserStats = functionsRegion.httpsCallable('recalculateAllUserStats');
+                const result = await recalculateAllUserStats();
+
+                const data = result.data;
+                
+                resultDiv.className = 'success';
+                resultDiv.innerHTML = `
+                    <h3>✅ Başarılı!</h3>
+                    <p><strong>Toplam Kullanıcı:</strong> ${data.totalUsers}</p>
+                    <p><strong>Başarılı:</strong> ${data.successCount}</p>
+                    <p><strong>Hata:</strong> ${data.errorCount}</p>
+                    <hr>
+                    <h4>Detaylar:</h4>
+                    <ul>
+                        ${data.results.map(user => `
+                            <li>
+                                <strong>${user.username || user.userId}</strong>: 
+                                ${user.success 
+                                    ? `Konu: ${user.confessionCount}, Beğeni: ${user.totalLikesReceived}, Yorum: ${user.totalCommentsGiven}`
+                                    : `Hata: ${user.error}`
+                                }
+                            </li>
+                        `).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <h3>❌ Hata!</h3>
+                    <p>${error.message}</p>
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Tüm İstatistikleri Düzelt';
+            }
+        }
+    </script>
+</body>
+</html>
