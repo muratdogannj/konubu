@@ -29,7 +29,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDFfD8_YIkUlIhngPCXpXSOQVM6Gpxjq14',
+    apiKey: 'AIzaSyC281PSPjf-V8yDdgRbIl7jRz7zX-zUv3k',
     appId: '1:549075737620:android:c402bee00da9dddbed9b01',
     messagingSenderId: '549075737620',
     projectId: 'itiraf-f9cc6',
@@ -37,8 +37,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDFfD8_YIkUlIhngPCXpXSOQVM6Gpxjq14',
-    appId: '1:549075737620:android:c402bee00da9dddbed9b01',
+    apiKey: 'AIzaSyAXQ68EDPCY-7L-k_vuweZkeSYVOklN06M',
+    appId: '1:549075737620:ios:733dfea88f7b6f9ded9b01',
     messagingSenderId: '549075737620',
     projectId: 'itiraf-f9cc6',
     storageBucket: 'itiraf-f9cc6.firebasestorage.app',

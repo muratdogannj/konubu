@@ -47,6 +47,12 @@
 		<true/>
 		<key>NSUserTrackingUsageDescription</key>
 		<string>Bu izin, size ilgi alanlarınıza uygun kişiselleştirilmiş reklamlar göstermemizi sağlar.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Profil fotoğrafı ve içerik paylaşımı için kamera erişimi gereklidir.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Profil fotoğrafı ve içerik paylaşımı için galeri erişimi gereklidir.</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Video içerikleri için mikrofon erişimi gereklidir.</string>
 		<key>SKAdNetworkItems</key>
 		<array>
 			<dict>
@@ -197,6 +203,11 @@
 				<key>SKAdNetworkIdentifier</key>
 				<string>3qcr597p9d.skadnetwork</string>
 			</dict>
+		</array>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+			<string>remote-notification</string>
 		</array>
 		<key>GADApplicationIdentifier</key>
 		<string>ca-app-pub-9171032253458681~6897156155</string>

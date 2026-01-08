@@ -9,7 +9,10 @@ import 'package:dedikodu_app/features/hashtag/hashtag_confessions_screen.dart';
 import 'package:dedikodu_app/features/profile/user_profile_view_screen.dart';
 import 'package:share_plus/share_plus.dart';
 
-class ConfessionCard extends StatelessWidget {
+import 'package:screenshot/screenshot.dart';
+import 'package:dedikodu_app/features/confession/widgets/shareable_confession_card.dart';
+
+class ConfessionCard extends StatefulWidget {
   final ConfessionModel confession;
   final bool showLocation;
   final VoidCallback? onTap;
@@ -22,11 +25,18 @@ class ConfessionCard extends StatelessWidget {
   });
 
   @override
+  State<ConfessionCard> createState() => _ConfessionCardState();
+}
+
+class _ConfessionCardState extends State<ConfessionCard> {
+  final _screenshotController = ScreenshotController();
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -37,13 +47,13 @@ class ConfessionCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                    backgroundImage: (!confession.isAnonymous && confession.authorImageUrl != null)
-                        ? NetworkImage(confession.authorImageUrl!)
+                    backgroundImage: (!widget.confession.isAnonymous && widget.confession.authorImageUrl != null)
+                        ? NetworkImage(widget.confession.authorImageUrl!)
                         : null,
-                    child: (!confession.isAnonymous && confession.authorImageUrl != null)
+                    child: (!widget.confession.isAnonymous && widget.confession.authorImageUrl != null)
                         ? null
                         : Icon(
-                            confession.isAnonymous ? Icons.visibility_off : Icons.person,
+                            widget.confession.isAnonymous ? Icons.visibility_off : Icons.person,
                             color: AppTheme.primaryColor,
                           ),
                   ),
@@ -53,14 +63,14 @@ class ConfessionCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         InkWell(
-                          onTap: confession.isAnonymous || confession.authorId == null || confession.authorId!.isEmpty
+                          onTap: widget.confession.isAnonymous || widget.confession.authorId == null || widget.confession.authorId!.isEmpty
                               ? null
                               : () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => UserProfileViewScreen(
-                                        userId: confession.authorId!,
+                                        userId: widget.confession.authorId!,
                                       ),
                                     ),
                                   );
@@ -68,16 +78,16 @@ class ConfessionCard extends StatelessWidget {
                           child: Row(
                             children: [
                               Text(
-                                confession.isAnonymous
-                                    ? NameMaskingHelper.maskUsername(confession.authorName)
-                                    : '@${confession.authorName ?? 'kullanıcı'}',
+                                widget.confession.isAnonymous
+                                    ? NameMaskingHelper.maskUsername(widget.confession.authorName)
+                                    : '@${widget.confession.authorName ?? 'kullanıcı'}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: confession.isAnonymous
+                                  color: widget.confession.isAnonymous
                                       ? Colors.black54
                                       : AppTheme.primaryColor,
-                                  decoration: confession.isAnonymous
+                                  decoration: widget.confession.isAnonymous
                                       ? null
                                       : TextDecoration.underline,
                                 ),
@@ -87,12 +97,12 @@ class ConfessionCard extends StatelessWidget {
                         ),
                         Row(
                           children: [
-                            if (showLocation) ...[
+                            if (widget.showLocation) ...[
                               const Icon(Icons.location_on, size: 14),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  _buildLocationText(confession),
+                                  _buildLocationText(widget.confession),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -104,7 +114,7 @@ class ConfessionCard extends StatelessWidget {
                               const SizedBox(width: 8),
                             ],
                             LiveTimeAgoText(
-                              dateTime: confession.createdAt,
+                              dateTime: widget.confession.createdAt,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -121,8 +131,8 @@ class ConfessionCard extends StatelessWidget {
               
               // Content with clickable hashtags
               _ExpandableConfessionText(
-                confession: confession,
-                onReadMore: onTap ?? () {},
+                confession: widget.confession,
+                onReadMore: widget.onTap ?? () {},
                 onHashtagTap: (hashtag) {
                   Navigator.push(
                     context,
@@ -141,18 +151,18 @@ class ConfessionCard extends StatelessWidget {
                 children: [
                   LikeButton(
                     targetType: 'confession',
-                    targetId: confession.id,
-                    initialLikeCount: confession.likeCount,
+                    targetId: widget.confession.id,
+                    initialLikeCount: widget.confession.likeCount,
                   ),
                   const SizedBox(width: 16),
-                  _buildStatButton(Icons.chat_bubble_outline, '${confession.commentCount}'),
+                  _buildStatButton(Icons.chat_bubble_outline, '${widget.confession.commentCount}'),
                   const SizedBox(width: 16),
-                  _buildStatButton(Icons.visibility_outlined, '${confession.viewCount}'),
+                  _buildStatButton(Icons.visibility_outlined, '${widget.confession.viewCount}'),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.share_outlined),
                     onPressed: () {
-                      _shareConfession(confession);
+                      _shareConfession(widget.confession);
                     },
                   ),
                 ],
@@ -188,33 +198,44 @@ class ConfessionCard extends StatelessWidget {
     );
   }
 
-  void _shareConfession(ConfessionModel confession) async {
-    final authorName = NameMaskingHelper.getDisplayName(
-      isAnonymous: confession.isAnonymous,
-      fullName: confession.authorName,
-    );
-    
-    String contentPreview = confession.content;
-    if (contentPreview.length > 200) {
-      contentPreview = '${contentPreview.substring(0, 200)}...';
+  Future<void> _shareConfession(ConfessionModel confession) async {
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Görsel hazırlanıyor...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      // Capture widget as image
+      final uint8List = await _screenshotController.captureFromWidget(
+        ShareableConfessionCard(confession: confession),
+        delay: const Duration(milliseconds: 100),
+        pixelRatio: 2.0,
+      );
+
+      // Share image directly from memory (Works on Web & Mobile)
+      final xFile = XFile.fromData(
+        uint8List,
+        mimeType: 'image/png',
+        name: 'konubu_share.png',
+      );
+
+      await Share.shareXFiles(
+        [xFile],
+        text: 'KONUBU\'da bunu gördüm! 👀\n#KONUBU',
+        subject: 'KONUBU Paylaşımı',
+      );
+    } catch (e) {
+      debugPrint('Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Paylaşım hatası: $e')),
+        );
+      }
     }
-    
-    final shareText = '''
-📢 KONUBU'da bir konu:
-
-"$contentPreview"
-
-- $authorName
-
-📍 ${_buildLocationText(confession)}
-
-#KONUBU ile paylaşıldı
-''';
-
-    await Share.share(
-      shareText,
-      subject: 'KONUBU - Konu Paylaşımı',
-    );
   }
 }
 

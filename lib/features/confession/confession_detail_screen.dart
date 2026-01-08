@@ -24,6 +24,9 @@ import 'package:dedikodu_app/core/services/ad_service.dart';
 import 'package:dedikodu_app/data/repositories/user_repository.dart';
 import 'package:dedikodu_app/data/models/user_model.dart';
 
+import 'package:screenshot/screenshot.dart';
+import 'package:dedikodu_app/features/confession/widgets/shareable_confession_card.dart';
+
 class ConfessionDetailScreen extends StatefulWidget {
   final ConfessionModel? confession;
   final String? confessionId;
@@ -40,6 +43,7 @@ class ConfessionDetailScreen extends StatefulWidget {
 }
 
 class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
+  final _screenshotController = ScreenshotController();
   final _confessionRepo = ConfessionRepository();
   final _commentRepo = CommentRepository();
   final _authService = AuthService();
@@ -808,34 +812,44 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
     }
   }
 
-  void _shareConfession() async {
-    // Create share text with content preview
-    final authorName = NameMaskingHelper.getDisplayName(
-      isAnonymous: _confession!.isAnonymous,
-      fullName: _confession!.authorName,
-    );
-    
-    String contentPreview = _confession!.content;
-    if (contentPreview.length > 200) {
-      contentPreview = '${contentPreview.substring(0, 200)}...';
+  Future<void> _shareConfession() async {
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Görsel hazırlanıyor...'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+
+      // Capture widget as image
+      final uint8List = await _screenshotController.captureFromWidget(
+        ShareableConfessionCard(confession: _confession!),
+        delay: const Duration(milliseconds: 100),
+        pixelRatio: 2.0,
+      );
+
+      // Share image directly from memory (Works on Web & Mobile)
+      final xFile = XFile.fromData(
+        uint8List,
+        mimeType: 'image/png',
+        name: 'konubu_share.png',
+      );
+
+      await Share.shareXFiles(
+        [xFile],
+        text: 'KONUBU\'da bunu gördüm! 👀\n#KONUBU',
+        subject: 'KONUBU Paylaşımı',
+      );
+    } catch (e) {
+      debugPrint('Share error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Paylaşım hatası: $e')),
+        );
+      }
     }
-    
-    final shareText = '''
-📢 KONUBU'da bir konu:
-
-"$contentPreview"
-
-- $authorName
-
-📍 ${_buildLocationText()}
-
-#KONUBU ile paylaşıldı
-''';
-
-    await Share.share(
-      shareText,
-      subject: 'KONUBU - Konu Paylaşımı',
-    );
   }
 
   void _editConfession() {

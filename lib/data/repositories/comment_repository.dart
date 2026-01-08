@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dedikodu_app/data/models/comment_model.dart';
+import 'package:dedikodu_app/core/constants/app_constants.dart';
 
 class CommentRepository {
   final FirebaseFirestore _firestore;
@@ -11,16 +12,20 @@ class CommentRepository {
   Future<void> createComment(CommentModel comment) async {
     // Save comment in confession's comments subcollection
     await _firestore
-        .collection('confessions')
+        .collection(AppConstants.confessionsCollection)
         .doc(comment.confessionId)
         .collection('comments')
         .add(comment.toJson());
     
-    // Increment comment count on confession
-    await _firestore
-        .collection('confessions')
-        .doc(comment.confessionId)
-        .update({'commentCount': FieldValue.increment(1)});
+    // Increment comment count on confession (Safe Update)
+    final confessionRef = _firestore.collection(AppConstants.confessionsCollection).doc(comment.confessionId);
+    final confessionDoc = await confessionRef.get();
+    
+    if (confessionDoc.exists) {
+      await confessionRef.update({'commentCount': FieldValue.increment(1)});
+    } else {
+      print('⚠️ Warning: Confession ${comment.confessionId} not found, could not increment comment count.');
+    }
   }
 
   // Get single comment by ID
