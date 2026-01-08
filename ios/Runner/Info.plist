@@ -213,21 +213,20 @@
 		<string>ca-app-pub-9171032253458681~6897156155</string>
 		<key>UIStatusBarHidden</key>
 		<true/>
-		<key>UIViewControllerBasedStatusBarAppearance</key>
+        <key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
-	</dict>
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Editor</string>
-            <key>CFBundleURLName</key>
-            <string>com.dgn.konubu</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>konubu</string>
-            </array>
-        </dict>
-    </array>
-</dict>
+        <key>CFBundleURLTypes</key>
+        <array>
+            <dict>
+                <key>CFBundleTypeRole</key>
+                <string>Editor</string>
+                <key>CFBundleURLName</key>
+                <string>com.dgn.konubu</string>
+                <key>CFBundleURLSchemes</key>
+                <array>
+                    <string>konubu</string>
+                </array>
+            </dict>
+        </array>
+    </dict>
 </plist>
