@@ -1,7 +1,7 @@
 // Forced Update: 2025-12-25 09:22
 const { onDocumentCreated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
-const { onCall } = require('firebase-functions/v2/https');
+const { onCall, onRequest } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 
