@@ -20,6 +20,7 @@ import 'package:dedikodu_app/features/premium/premium_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:dedikodu_app/core/utils/date_helper.dart';
 import 'package:dedikodu_app/core/widgets/live_time_ago_text.dart';
+import 'package:dedikodu_app/core/utils/name_masking_helper.dart';
 
 class UserProfileViewScreen extends StatefulWidget {
   final String userId;
@@ -762,9 +763,10 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
                             Row(
                               children: [
                                 Text(
-                                  comment.isAnonymous
-                                      ? 'Gizli'
-                                      : '@${comment.authorName}',
+                                  NameMaskingHelper.getDisplayName(
+                                    isAnonymous: comment.isAnonymous,
+                                    fullName: comment.authorName,
+                                  ),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -968,14 +970,15 @@ class _UserProfileViewScreenState extends State<UserProfileViewScreen> {
                         Row(
                           children: [
                             Text(
-                              confession.isAnonymous
-                                  ? 'Gizli' // Using direct string as in Home
-                                  : '@${confession.authorName ?? 'kullanıcı'}',
+                              NameMaskingHelper.getDisplayName(
+                                isAnonymous: confession.isAnonymous,
+                                fullName: confession.authorName,
+                              ),
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                                 color: confession.isAnonymous
-                                    ? Colors.black54
+                                    ? Colors.black87
                                     : AppTheme.primaryColor,
                               ),
                             ),

@@ -201,11 +201,12 @@ class _ConfessionCardState extends State<ConfessionCard> {
   Future<void> _shareConfession(ConfessionModel confession) async {
     // URL Link Sharing Strategy
     final confessionId = confession.id;
-    // Assuming a hypothetical web preview/deep link structure
-    // Since dynamic links are complex, we use a cleaner text format with a direct link
-    // that the user can click.
-    final shareUrl = 'https://konubu.app/c/$confessionId';
-    final storeUrl = 'https://konubu.app/download';
+    
+    // CUSTOM DOMAIN SETUP
+    const baseUrl = 'https://konubu.app';
+    
+    final shareUrl = '$baseUrl/c/$confessionId';
+    final storeUrl = '$baseUrl/download';
 
     final shareText = '''
 🔥 KONUBU'da bir itiraf paylaşıldı!
