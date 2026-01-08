@@ -214,7 +214,9 @@ dependencies:
   firebase_analytics: ^11.6.0
   app_tracking_transparency: ^2.0.6+1
   screenshot: ^3.0.0
+  screenshot: ^3.0.0
   path_provider: ^2.1.5
+  app_links: ^6.3.0
 
 dev_dependencies:
   flutter_test:

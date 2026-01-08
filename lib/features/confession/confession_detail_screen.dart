@@ -813,43 +813,28 @@ class _ConfessionDetailScreenState extends State<ConfessionDetailScreen> {
   }
 
   Future<void> _shareConfession() async {
-    try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Görsel hazırlanıyor...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
+    // URL Link Sharing Strategy
+    final confessionId = _confession!.id;
+    // Assuming a hypothetical web preview/deep link structure
+    // Since dynamic links are complex, we use a cleaner text format with a direct link
+    // that the user can click.
+    final shareUrl = 'https://konubu.app/c/$confessionId';
+    final storeUrl = 'https://konubu.app/download';
 
-      // Capture widget as image
-      final uint8List = await _screenshotController.captureFromWidget(
-        ShareableConfessionCard(confession: _confession!),
-        delay: const Duration(milliseconds: 100),
-        pixelRatio: 2.0,
-      );
+    final shareText = '''
+🔥 KONUBU'da bir itiraf paylaşıldı!
 
-      // Share image directly from memory (Works on Web & Mobile)
-      final xFile = XFile.fromData(
-        uint8List,
-        mimeType: 'image/png',
-        name: 'konubu_share.png',
-      );
+Konuyu görüntülemek için tıkla:
+$shareUrl
 
-      await Share.shareXFiles(
-        [xFile],
-        text: 'KONUBU\'da bunu gördüm! 👀\n#KONUBU',
-        subject: 'KONUBU Paylaşımı',
-      );
-    } catch (e) {
-      debugPrint('Share error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Paylaşım hatası: $e')),
-        );
-      }
-    }
+Uygulamayı indir:
+$storeUrl
+''';
+
+    await Share.share(
+      shareText,
+      subject: 'KONUBU - Konu Paylaşımı',
+    );
   }
 
   void _editConfession() {

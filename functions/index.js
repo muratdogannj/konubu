@@ -1152,3 +1152,158 @@ exports.cleanupUserData = functions
         await batch.commit();
         console.log(`✅ User data cleanup complete for ${uid}`);
     });
+
+/**
+ * Handle public confession sharing links
+ * Renders HTML with Open Graph tags for social media previews
+ * and handles smart redirection to App/Store.
+ */
+exports.shareConfession = onRequest(async (req, res) => {
+    try {
+        const path = req.path.split('/'); // /c/123 -> ['', 'c', '123']
+        const confessionId = path[2];
+
+        if (!confessionId) {
+            return res.status(404).send('Konu bulunamadı.');
+        }
+
+        const db = admin.firestore();
+        const doc = await db.collection('confessions').doc(confessionId).get();
+
+        if (!doc.exists) {
+            return res.status(404).send('Böyle bir konu yayınlanmamış veya silinmiş.');
+        }
+
+        const data = doc.data();
+
+        // Truncate content for description
+        let description = data.content || '';
+        if (description.length > 150) {
+            description = description.substring(0, 147) + '...';
+        }
+
+        // Dynamic Title based on content or author
+        const title = data.isAnonymous ? 'Anonim bir itiraf' : 'Biri bir konu açtı!';
+
+        // Custom URL Scheme to open the app directly
+        const appScheme = `konubu://c/${confessionId}`;
+
+        // Store Links
+        const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.dgn.konubu';
+        const appStoreUrl = 'https://apps.apple.com/app/id6471926685'; // Replace with actual ID if different
+
+        const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${title} | KONUBU</title>
+            
+            <!-- Open Graph / Facebook / WhatsApp -->
+            <meta property="og:type" content="website">
+            <meta property="og:url" content="https://konubu.com/c/${confessionId}">
+            <meta property="og:title" content="${title}">
+            <meta property="og:description" content="${description}">
+            <meta property="og:image" content="https://konubu.com/assets/social_preview.png"> 
+            <!-- (You should upload a default social preview image to your hosting) -->
+
+            <!-- Twitter -->
+            <meta property="twitter:card" content="summary_large_image">
+            <meta property="twitter:url" content="https://konubu.com/c/${confessionId}">
+            <meta property="twitter:title" content="${title}">
+            <meta property="twitter:description" content="${description}">
+            <meta property="twitter:image" content="https://konubu.com/assets/social_preview.png">
+
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    background-color: #f5f5f5;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    margin: 0;
+                    text-align: center;
+                    padding: 20px;
+                }
+                .card {
+                    background: white;
+                    padding: 30px;
+                    border-radius: 20px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                    max-width: 90%;
+                    width: 400px;
+                }
+                .logo {
+                    width: 80px;
+                    height: 80px;
+                    margin-bottom: 20px;
+                    border-radius: 20px;
+                }
+                h1 { font-size: 22px; margin-bottom: 10px; color: #333; }
+                p { color: #666; margin-bottom: 30px; line-height: 1.5; }
+                .btn {
+                    display: block;
+                    width: 100%;
+                    padding: 15px 0;
+                    margin-bottom: 10px;
+                    border-radius: 12px;
+                    text-decoration: none;
+                    font-weight: bold;
+                    transition: transform 0.2s;
+                }
+                .btn:active { transform: scale(0.98); }
+                .btn-primary { background-color: #FF5722; color: white; }
+                .btn-secondary { background-color: #333; color: white; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <!-- Replace with your hosted logo URL -->
+                <img src="https://konubu.com/assets/icon_ios.png" alt="KONUBU" class="logo"> 
+                
+                <h1>Konuyu Uygulamada Gör</h1>
+                <p>"${description}"</p>
+
+                <a href="${appScheme}" class="btn btn-primary">Uygulamada Aç</a>
+                <a href="${appStoreUrl}" id="store-link" class="btn btn-secondary">İndir (App Store / Play Store)</a>
+            </div>
+
+            <script>
+                // Auto-redirect logic
+                window.onload = function() {
+                    var userAgent = navigator.userAgent || navigator.vendor || window.opera;
+                    var isAndroid = /android/i.test(userAgent);
+                    var isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+
+                    var storeLink = document.getElementById('store-link');
+                    
+                    if (isAndroid) {
+                        storeLink.href = "${playStoreUrl}";
+                        storeLink.innerText = "Google Play'den İndir";
+                    } else if (isIOS) {
+                        storeLink.href = "${appStoreUrl}";
+                        storeLink.innerText = "App Store'dan İndir";
+                    }
+
+                    // Try to open app immediately
+                    window.location.href = "${appScheme}";
+                    
+                    // Optional: Fallback to store if app doesn't open (often blocked by browsers, but "Uygulamada Aç" button is safe)
+                };
+            </script>
+        </body>
+        </html>
+        `;
+
+        res.set('Cache-Control', 'public, max-age=300, s-maxage=600');
+        res.send(html);
+
+    } catch (error) {
+        console.error('Share Error:', error);
+        res.status(500).send('Sunucu hatası');
+    }
+});

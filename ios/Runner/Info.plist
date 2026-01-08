@@ -216,4 +216,18 @@
 		<key>UIViewControllerBasedStatusBarAppearance</key>
 		<false/>
 	</dict>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>com.dgn.konubu</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>konubu</string>
+            </array>
+        </dict>
+    </array>
+</dict>
 </plist>

@@ -12,6 +12,7 @@ import 'package:dedikodu_app/data/repositories/user_repository.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:dedikodu_app/core/widgets/connectivity_wrapper.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
+import 'package:dedikodu_app/core/services/deep_link_service.dart';
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -59,6 +60,13 @@ void main() async {
       debugPrint('ATT Status: $status');
     } catch (e) {
       debugPrint('ATT Error: $e');
+    }
+    
+    // Initialize Deep Linking
+    try {
+      await DeepLinkService().initialize();
+    } catch (e) {
+      debugPrint('Deep Link Init Error: $e');
     }
   });
 }
