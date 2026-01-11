@@ -373,17 +373,31 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               tooltip: 'Profil',
             ),
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationsInboxScreen(),
-                  ),
+            StreamBuilder<UserModel?>(
+              stream: UserRepository().getUserStream(_authService.currentUser!.uid),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data?.unreadNotificationCount ?? 0;
+                
+                return IconButton(
+                  icon: unreadCount > 0
+                      ? Badge(
+                          label: Text('$unreadCount'),
+                          child: const Icon(Icons.notifications_outlined),
+                        )
+                      : const Icon(Icons.notifications_outlined),
+                  onPressed: () {
+                    // Reset count locally/optimistically as well if needed, 
+                    // but the screen init will handle it.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationsInboxScreen(),
+                      ),
+                    );
+                  },
+                  tooltip: 'Bildirimler',
                 );
               },
-              tooltip: 'Bildirimler',
             ),
           ],
           // Misafir kullanıcılar için giriş yap butonu

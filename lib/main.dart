@@ -13,6 +13,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:dedikodu_app/core/widgets/connectivity_wrapper.dart';
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:dedikodu_app/core/services/deep_link_service.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -71,8 +72,33 @@ void main() async {
   });
 }
 
-class DedikoduApp extends StatelessWidget {
+class DedikoduApp extends StatefulWidget {
   const DedikoduApp({super.key});
+
+  @override
+  State<DedikoduApp> createState() => _DedikoduAppState();
+}
+
+class _DedikoduAppState extends State<DedikoduApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Clear app icon badge when app is opened
+      FlutterAppBadger.removeBadge();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

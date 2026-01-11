@@ -21,6 +21,25 @@ class _NotificationsInboxScreenState extends State<NotificationsInboxScreen> {
   final _firestore = FirebaseFirestore.instance;
 
   @override
+  void initState() {
+    super.initState();
+    _resetUnreadCount();
+  }
+
+  Future<void> _resetUnreadCount() async {
+    final userId = _authService.currentUserId;
+    if (userId != null) {
+      try {
+        await _firestore.collection('users').doc(userId).update({
+          'unreadNotificationCount': 0,
+        });
+      } catch (e) {
+        print('Error resetting unread count: $e');
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final userId = _authService.currentUserId;
 

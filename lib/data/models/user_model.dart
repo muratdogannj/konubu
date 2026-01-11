@@ -42,6 +42,9 @@ class UserModel extends Equatable {
   final int dailyMessageCount;
   final String? lastMessageReset;
   final int totalMessagesSent;
+  
+  // Dynamic Badge
+  final int unreadNotificationCount;
 
   const UserModel({
     required this.uid,
@@ -74,6 +77,7 @@ class UserModel extends Equatable {
     this.dailyMessageCount = 0,
     this.lastMessageReset,
     this.totalMessagesSent = 0,
+    this.unreadNotificationCount = 0,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, String id) {
@@ -122,6 +126,7 @@ class UserModel extends Equatable {
       dailyMessageCount: (json['dailyMessageCount'] as num?)?.toInt() ?? 0,
       lastMessageReset: json['lastMessageReset'] as String?,
       totalMessagesSent: (json['totalMessagesSent'] as num?)?.toInt() ?? 0,
+      unreadNotificationCount: (json['unreadNotificationCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -157,6 +162,7 @@ class UserModel extends Equatable {
       'dailyMessageCount': dailyMessageCount,
       'lastMessageReset': lastMessageReset,
       'totalMessagesSent': totalMessagesSent,
+      'unreadNotificationCount': unreadNotificationCount,
     };
   }
 
@@ -191,6 +197,7 @@ class UserModel extends Equatable {
     int? dailyMessageCount,
     String? lastMessageReset,
     int? totalMessagesSent,
+    int? unreadNotificationCount,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -223,6 +230,7 @@ class UserModel extends Equatable {
       dailyMessageCount: dailyMessageCount ?? this.dailyMessageCount,
       lastMessageReset: lastMessageReset ?? this.lastMessageReset,
       totalMessagesSent: totalMessagesSent ?? this.totalMessagesSent,
+      unreadNotificationCount: unreadNotificationCount ?? this.unreadNotificationCount,
     );
   }
 
@@ -257,5 +265,6 @@ class UserModel extends Equatable {
         dailyMessageCount,
         lastMessageReset,
         totalMessagesSent,
+        unreadNotificationCount,
       ];
 }

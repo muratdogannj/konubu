@@ -188,7 +188,19 @@ async function sendConfessionNotification(confession, confessionId) {
                         notification: { channelId: 'konubu_channel' },
                     },
                     apns: {
-                        payload: { aps: { sound: 'default', badge: 1 } },
+                        headers: {
+                            'apns-priority': '10',
+                            'apns-push-type': 'alert',
+                        },
+                        payload: {
+                            aps: {
+                                alert: {
+                                    title: notification.title,
+                                    body: notification.body,
+                                },
+                                sound: 'default',
+                            }
+                        },
                     },
                 })
             )
@@ -206,6 +218,9 @@ async function sendConfessionNotification(confession, confessionId) {
             result.responses.forEach((response, idx) => {
                 if (!response.success) {
                     const error = response.error;
+                    console.error(`❌ Error sending to token ${batches[batchIndex][idx]}:`, error);
+                    if (error.code) console.error('Error Code:', error.code);
+
                     if (error.code === 'messaging/invalid-registration-token' ||
                         error.code === 'messaging/registration-token-not-registered') {
                         invalidTokens.push(batches[batchIndex][idx]);
@@ -367,18 +382,39 @@ exports.sendCommentNotification = onDocumentCreated(
             }
 
             const user = userDoc.data();
+            // 1. Persist to Firestore for In-App Notification Area (Always do this first)
+            await db.collection('notifications').add({
+                userId: targetUserId,
+                title: notificationTitle,
+                body: truncateText(comment.content, 100),
+                confessionId: confessionId,
+                commentId: commentId,
+                type: notificationType,
+                isRead: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                SenderId: comment.authorId || comment.userId,
+            });
+
+            // Increment unread count
+            await db.collection('users').doc(targetUserId).update({
+                unreadNotificationCount: admin.firestore.FieldValue.increment(1)
+            });
+
+            console.log(`✅ ${notificationType} saved to In-App Inbox for ${targetUserId}`);
+
+            // 2. Check Prerequisites for Push
             if (!user.fcmToken || !user.notificationsEnabled) {
-                console.log('User has no token or notifications disabled.');
+                console.log('User has no token or notifications disabled. Skipping Push.');
                 return null;
             }
 
             if (!checkPreference(user)) {
-                console.log(`User disabled ${notificationType} notifications.`);
+                console.log(`User disabled ${notificationType} notifications. Skipping Push.`);
                 return null;
             }
 
-            // Send FCM
-            await admin.messaging().send({
+            // 3. Send FCM
+            const response = await admin.messaging().send({
                 token: user.fcmToken,
                 notification: {
                     title: notificationTitle,
@@ -395,28 +431,30 @@ exports.sendCommentNotification = onDocumentCreated(
                     notification: { channelId: 'konubu_channel' }
                 },
                 apns: {
-                    payload: { aps: { sound: 'default', badge: 1 } }
+                    headers: {
+                        'apns-priority': '10',
+                        'apns-push-type': 'alert',
+                    },
+                    payload: {
+                        aps: {
+                            alert: {
+                                title: notificationTitle,
+                                body: truncateText(comment.content, 100),
+                            },
+                            sound: 'default',
+                            badge: (user.unreadNotificationCount || 0) + 1
+                        }
+                    }
                 }
             });
 
-            // Persist to Firestore for In-App Notification Area
-            await db.collection('notifications').add({
-                userId: targetUserId,
-                title: notificationTitle,
-                body: truncateText(comment.content, 100),
-                confessionId: confessionId,
-                commentId: commentId,
-                type: notificationType,
-                isRead: false,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                SenderId: comment.authorId || comment.userId, // Who triggered it
-            });
-
-            console.log(`✅ ${notificationType} sent and saved for ${user.username || targetUserId}`);
+            console.log(`✅ ${notificationType} Push sent to ${user.username || targetUserId}. ID: ${response}`);
             return { success: true };
 
         } catch (error) {
-            console.error('Error sending comment notification:', error);
+            console.error('❌ Error sending comment notification:', error);
+            if (error.code) console.error('Error Code:', error.code);
+            if (error.message) console.error('Error Message:', error.message);
             throw error;
         }
     }
@@ -593,38 +631,67 @@ exports.onLikeCreated = onDocumentCreated(
                     const userDoc = await db.collection('users').doc(authorId).get();
                     if (userDoc.exists) {
                         const user = userDoc.data();
+                        const title = targetType === 'confession' ? 'Konun beğenildi! ❤️' : 'Yorumun beğenildi! ❤️';
+                        const body = 'Birisi paylaşımını beğendi.';
+
+                        // 1. Persist to Firestore (Always)
+                        await db.collection('notifications').add({
+                            userId: authorId,
+                            title: title,
+                            body: body,
+                            confessionId: targetType === 'confession' ? targetId : null,
+                            type: 'new_like',
+                            isRead: false,
+                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        });
+
+                        // Increment unread count
+                        await db.collection('users').doc(authorId).update({
+                            unreadNotificationCount: admin.firestore.FieldValue.increment(1)
+                        });
+
+                        console.log('✅ In-App Like Notification saved.');
+
+                        // 2. Check Push Prerequisites
                         if (user.fcmToken && user.notificationsEnabled && user.notifyOnLike !== false) {
-                            const title = targetType === 'confession' ? 'Konun beğenildi! ❤️' : 'Yorumun beğenildi! ❤️';
-                            const body = 'Birisi paylaşımını beğendi.';
-
                             // Send FCM
-                            await admin.messaging().send({
-                                token: user.fcmToken,
-                                notification: {
-                                    title: title,
-                                    body: body,
-                                },
-                                data: {
-                                    type: 'new_like',
-                                    confessionId: targetId, // If comment, this prevents navigation unless we resolve comment's confession.
-                                    // For comment likes, we might need parent confession ID to navigate properly.
-                                    // But let's stick to basic logic first.
-                                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
-                                },
-                                android: { priority: 'high', notification: { channelId: 'konubu_channel' } }
-                            });
-
-                            // Persist to Firestore
-                            await db.collection('notifications').add({
-                                userId: authorId,
-                                title: title,
-                                body: body,
-                                confessionId: targetType === 'confession' ? targetId : null, // Todo: better handling for comments
-                                type: 'new_like',
-                                isRead: false,
-                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                            });
-                            console.log('✅ Like notification sent and saved.');
+                            try {
+                                const response = await admin.messaging().send({
+                                    token: user.fcmToken,
+                                    notification: {
+                                        title: title,
+                                        body: body,
+                                    },
+                                    data: {
+                                        type: 'new_like',
+                                        confessionId: targetId,
+                                        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                                    },
+                                    android: { priority: 'high', notification: { channelId: 'konubu_channel' } },
+                                    apns: {
+                                        headers: {
+                                            'apns-priority': '10',
+                                            'apns-push-type': 'alert',
+                                        },
+                                        payload: {
+                                            aps: {
+                                                alert: {
+                                                    title: title,
+                                                    body: body,
+                                                },
+                                                sound: 'default',
+                                                badge: (user.unreadNotificationCount || 0) + 1
+                                            }
+                                        }
+                                    }
+                                });
+                                console.log(`✅ Like Push Notification sent. ID: ${response}`);
+                            } catch (pushError) {
+                                console.error('❌ Error sending Like Push:', pushError);
+                                if (pushError.code) console.error('Error Code:', pushError.code);
+                            }
+                        } else {
+                            console.log('User disabled like notifications or has no token. Skipping Push.');
                         }
                     }
                 }
