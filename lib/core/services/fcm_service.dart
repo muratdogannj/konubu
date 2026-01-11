@@ -112,7 +112,7 @@ class FCMService {
       final notification = message.notification;
       final android = message.notification?.android;
 
-      if (notification != null && android != null) {
+      if (notification != null) {
         // Encode data to pass as payload
         String? payload;
         try {

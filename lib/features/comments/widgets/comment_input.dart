@@ -51,6 +51,28 @@ class _CommentInputState extends State<CommentInput> {
       return;
     }
 
+    // Block Guest/Anonymous users
+    if (_authService.isAnonymous) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Misafirler yorum yapamaz. Lütfen kayıt olun.'),
+            action: SnackBarAction(
+              label: 'Giriş Yap',
+              textColor: Colors.white,
+              onPressed: () {
+                // Navigate to welcome/auth screen
+                // Note: Navigator logic might depend on app structure, 
+                // but usually signing out triggers AuthWrapper update
+                _authService.signOut(); 
+              },
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {

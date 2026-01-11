@@ -236,35 +236,45 @@ async function sendConfessionNotification(confession, confessionId) {
         let batch = db.batch();
         let operationCounter = 0;
         let persistedCount = 0;
+        const processedUserIdSet = new Set(); // To avoid duplicate inbox entries
 
-        cityFollowersSnapshot.forEach((doc) => {
-            const user = doc.data();
-            const notifyCity = user.notifyOnCityConfession !== false;
+        snapshots.forEach(snapshot => {
+            snapshot.docs.forEach((doc) => {
+                // Avoid processing the same user multiple times (e.g. matched both int and string plate)
+                if (processedUserIdSet.has(doc.id)) return;
+                processedUserIdSet.add(doc.id);
 
-            // Save to inbox if user wants notifications (even if no token, they might check app manually)
-            // or strictly following notifyCity pref.
-            if (notifyCity) {
-                const newRef = db.collection('notifications').doc();
-                batch.set(newRef, {
-                    userId: doc.id,
-                    title: notification.title,
-                    body: notification.body,
-                    confessionId: confessionId,
-                    cityName: cityName,
-                    type: 'new_city_confession',
-                    isRead: false,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
+                // Skip author (already filtered in tokens, but good to double check)
+                if (doc.id === confession.authorId) return;
 
-                operationCounter++;
-                persistedCount++;
+                const user = doc.data();
+                const notifyCity = user.notifyOnCityConfession !== false;
 
-                if (operationCounter === 499) {
-                    writeBatches.push(batch.commit());
-                    batch = db.batch();
-                    operationCounter = 0;
+                // Save to inbox if user wants notifications
+                if (notifyCity) {
+                    const newRef = db.collection('notifications').doc();
+                    batch.set(newRef, {
+                        userId: doc.id,
+                        title: notification.title,
+                        body: notification.body,
+                        confessionId: confessionId,
+                        cityName: cityName,
+                        cityPlateCode: parseInt(confession.cityPlateCode),
+                        type: 'new_city_confession',
+                        isRead: false,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    });
+
+                    operationCounter++;
+                    persistedCount++;
+
+                    if (operationCounter === 499) {
+                        writeBatches.push(batch.commit());
+                        batch = db.batch();
+                        operationCounter = 0;
+                    }
                 }
-            }
+            });
         });
 
         // Commit remaining
