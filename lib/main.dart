@@ -1,4 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dedikodu_app/data/models/user_model.dart';
 import 'package:dedikodu_app/core/services/analytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
