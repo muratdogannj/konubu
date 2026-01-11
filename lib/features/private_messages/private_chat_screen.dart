@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:dedikodu_app/features/profile/user_profile_view_screen.dart';
+import 'package:screen_protector/screen_protector.dart';
 
 class PrivateChatScreen extends StatefulWidget {
   final String otherUserId;
@@ -266,6 +267,28 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   Widget _buildMessageBubble(PrivateMessage message) {
     final currentUserId = _authService.currentUser?.uid ?? '';
     final isMe = message.senderId == currentUserId;
+    // Check if viewed by me (or by anyone if I'm the sender? No, typically "Viewed" status)
+    // Actually, if I sent it, I should see "Tek Seferlik Fotoğraf" (but maybe not the image itself if it's strictly one-time).
+    // Let's assume sender can see the placeholder "Tek Seferlik Fotoğraf" but not open it again effectively, 
+    // or allows opening until receiver views it?
+    // User request: "kapatıldığında da tekrar açılmamalı".
+    // Simplify: If I am sender, I see "Tek Seferlik Fotoğraf" (sent). Can I open it? Maybe not necessary.
+    // Let's focus on Receiver.
+    
+    // Logic:
+    // If one-time:
+    //   If Viewed by ME: Show "Viewed" state (Disabled).
+    //   If NOT Viewed by ME: Show "View" button (Enabled).
+    // Note: If I am sender, "Viewed by ME" might be false initially. 
+    // If I open it, I view it? Usually sender shouldn't burn the receiver's view?
+    // Let's say: Sender sees "Tek Seferlik Fotoğraf" (Sent). If receiver viewed it, maybe update status?
+    // Current model has `viewedBy`.
+    // Let's just allow opening if not in viewedBy, regardless of sender/receiver.
+    // But if I am sender, I shouldn't be able to "view" it and delete it? 
+    // Actually, yes, sender usually can't view their own one-time photo after sending in apps like WhatsApp.
+    
+    final bool isViewed = message.viewedBy.contains(currentUserId);
+    final bool canView = !isViewed; 
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -308,32 +331,96 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Image message
-                  if (message.isImage && message.imageUrl != null)
-                    GestureDetector(
-                      onTap: () => _showFullImage(message),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: message.imageUrl!,
-                          width: 200,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            width: 200,
-                            height: 150,
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
+                  if (message.isImage)
+                    if (message.isOneTime)
+                      Container(
+                        width: 200,
+                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: isMe 
+                              ? Colors.black.withOpacity(0.1) 
+                              : Colors.white.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isMe ? Colors.white30 : Colors.grey[400]!,
+                            width: 1,
                           ),
-                          errorWidget: (context, url, error) => Container(
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              // Validations for Sender vs Receiver
+                              (message.viewedBy.isNotEmpty) 
+                                  ? Icons.visibility_off // Viewed
+                                  : (isMe ? Icons.timer : Icons.whatshot), // Sent vs Ready
+                              color: isMe ? Colors.white : Colors.red,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              // Text Logic
+                              (message.viewedBy.isNotEmpty)
+                                  ? 'Fotoğraf Görüntülendi'
+                                  : (isMe ? 'Fotoğraf Gönderildi (Tek Seferlik)' : 'Fotoğrafı Görüntüle'),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: isMe ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontStyle: (message.viewedBy.isNotEmpty) ? FontStyle.italic : null,
+                              ),
+                            ),
+                            if (message.viewedBy.isEmpty && !isMe)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Dokun ve görüntüle',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ).wrapIf(
+                        // Add GestureDetector ONLY if:
+                        // 1. I am Receiver (!isMe)
+                        // 2. Not Viewed yet (message.viewedBy.isEmpty)
+                        condition: !isMe && message.viewedBy.isEmpty,
+                        builder: (child) => GestureDetector(
+                          onTap: () => _showFullImage(message),
+                          child: child,
+                        ),
+                      )
+                    else
+                      // Normal Image
+                      GestureDetector(
+                        onTap: () => _showFullImage(message),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: message.imageUrl ?? '',
                             width: 200,
-                            height: 150,
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.error),
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: 200,
+                              height: 150,
+                              color: Colors.grey[300],
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: 200,
+                              height: 150,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.error),
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   // Text message
                   if (!message.isImage)
                     Text(
@@ -596,77 +683,111 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   }
 
   // Show full-screen image
-  void _showFullImage(PrivateMessage message) {
-    // Mark as viewed if one-time
+  void _showFullImage(PrivateMessage message) async {
+    // Enable screenshot protection for one-time messages
     if (message.isOneTime) {
-      final currentUserId = _authService.currentUser!.uid;
-      final ids = [currentUserId, widget.otherUserId]..sort();
-      final conversationId = '${ids[0]}_${ids[1]}';
-      _messageRepo.markImageAsViewed(message.id, conversationId);
+      await ScreenProtector.preventScreenshotOn();
+      await ScreenProtector.protectDataLeakageOn();
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.black,
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: CachedNetworkImage(
-                  imageUrl: message.imageUrl!,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                  errorWidget: (context, url, error) => const Icon(
-                    Icons.error,
-                    color: Colors.white,
+    try {
+      if (!mounted) return;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false, // Force use of close button logic if needed, but tap outside is ok? 
+        // For one-time, better to control exit.
+        builder: (context) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.zero,
+          child: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  child: CachedNetworkImage(
+                    imageUrl: message.imageUrl!,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                    errorWidget: (context, url, error) => Column(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         const Icon(Icons.error, color: Colors.white, size: 48),
+                         const SizedBox(height: 16),
+                         const Text(
+                           'Fotoğraf yüklenemedi veya süresi doldu.',
+                           style: TextStyle(color: Colors.white),
+                         ),
+                       ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-                color: Colors.white,
-                iconSize: 32,
-              ),
-            ),
-            // One-time indicator
-            if (message.isOneTime)
               Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.whatshot, color: Colors.white, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'Tek Kullanımlık',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+                top: 40,
+                right: 20,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  color: Colors.white,
+                  iconSize: 32,
                 ),
               ),
-          ],
+              // One-time indicator
+              if (message.isOneTime)
+                Positioned(
+                  top: 40,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.whatshot, color: Colors.white, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Tek Kullanımlık - Screenshot Alınamaz',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      // Disable protection and mark as viewed
+      if (message.isOneTime) {
+        await ScreenProtector.preventScreenshotOff();
+        await ScreenProtector.protectDataLeakageOff();
+        
+        final currentUserId = _authService.currentUser?.uid;
+        if (currentUserId != null) {
+            final ids = [currentUserId, widget.otherUserId]..sort();
+            final conversationId = '${ids[0]}_${ids[1]}';
+            _messageRepo.markImageAsViewed(message.id, conversationId);
+        }
+      }
+    }
+  }
+}
+
+extension WidgetExtension on Widget {
+  Widget wrapIf({required bool condition, required Widget Function(Widget) builder}) {
+    if (condition) {
+      return builder(this);
+    }
+    return this;
   }
 }

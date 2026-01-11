@@ -330,7 +330,7 @@ class PrivateMessageRepository {
     }
   }
 
-  /// Mark image as viewed and delete if one-time
+  /// Mark image as viewed and delete content if one-time
   Future<void> markImageAsViewed(String messageId, String conversationId) async {
     final currentUser = _authService.currentUser;
     if (currentUser == null) return;
@@ -350,19 +350,27 @@ class PrivateMessageRepository {
       // If one-time and not viewed by current user
       if (message.isOneTime && !message.viewedBy.contains(currentUser.uid)) {
         // Add to viewedBy
+        // Also remove imageUrl field or set to null/empty to indicate it's gone
         await messageRef.update({
           'viewedBy': FieldValue.arrayUnion([currentUser.uid]),
+          // We don't nullify imageUrl immediately if we want to allow the *other* person to see it?
+          // No, one-time means one time.
+          // Yet, typically one-time is per-person? No, usually "once someone views it".
+          // But private chat is 1-1. If receiver views it, it's done. 
+          // If I set imageUrl to null, sender can't see it either. That's fine.
+          // But wait, if I set it to null, then 'isImage' is still true.
+          // Let's just rely on viewedBy check in UI for the current user.
+          // Secure deletion from storage:
         });
 
-        // Delete image from Storage and Firestore
         if (message.imageUrl != null) {
-          await _storageService.deleteMessageImage(message.imageUrl!);
+          // Fire and forget deletion to not block UI
+          _storageService.deleteMessageImage(message.imageUrl!).catchError((e) {
+             print('Error deleting image: $e');
+          });
         }
-
-        // Delete message after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () async {
-          await messageRef.delete();
-        });
+        
+        // We do NOT delete the message document anymore, so it stays as "Viewed" in chat.
       }
     } catch (e) {
       print('Error marking image as viewed: $e');

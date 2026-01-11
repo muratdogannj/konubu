@@ -123,4 +123,26 @@ class NotificationService {
       print('Error queuing notification: $e');
     }
   }
+
+  /// Send a system notification to a specific user (e.g., Ban/Unban info)
+  Future<void> sendSystemNotification({
+    required String userId,
+    required String title,
+    required String body,
+    String? type = 'system',
+  }) async {
+    try {
+      await _firestore.collection('notifications').add({
+        'userId': userId,
+        'title': title,
+        'body': body,
+        'type': type,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      print('System notification sent to user: $userId');
+    } catch (e) {
+      print('Error sending system notification: $e');
+    }
+  }
 }
