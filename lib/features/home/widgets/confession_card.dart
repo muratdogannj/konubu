@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:screenshot/screenshot.dart';
 import 'package:dedikodu_app/features/confession/widgets/shareable_confession_card.dart';
+import 'package:dedikodu_app/core/services/view_tracker_service.dart';
 
 class ConfessionCard extends StatefulWidget {
   final ConfessionModel confession;
@@ -32,6 +33,11 @@ class _ConfessionCardState extends State<ConfessionCard> {
   final _screenshotController = ScreenshotController();
 
   @override
+  void initState() {
+    super.initState();
+    // Track impression (view)
+    ViewTrackerService.instance.trackView(widget.confession.id);
+  }
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),

@@ -11,6 +11,8 @@ import 'package:dedikodu_app/features/admin/widgets/ban_user_dialog.dart';
 import 'package:dedikodu_app/features/confession/confession_detail_screen.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import 'package:cloud_functions/cloud_functions.dart';
+
 class AdminReportsTab extends StatefulWidget {
   const AdminReportsTab({super.key});
 
@@ -163,30 +165,42 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
             // Actions (Only for pending reports)
             if (report.status == ReportStatus.pending) ...[
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _banUser(report),
-                    icon: const Icon(Icons.block, size: 16, color: Colors.orange),
-                    label: const Text('Yasakla', style: TextStyle(color: Colors.orange)),
-                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.orange)),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () => _dismissReport(report),
-                    child: const Text('Reddet'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _deleteContent(report),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                     OutlinedButton(
+                      onPressed: () => _deleteUserAccount(report),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: Colors.red,
+                      ),
+                      child: const Text('Hesabı Sil')
                     ),
-                    child: const Text('İçeriği Sil'),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => _banUser(report),
+                      icon: const Icon(Icons.block, size: 16, color: Colors.orange),
+                      label: const Text('Yasakla', style: TextStyle(color: Colors.orange)),
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.orange)),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: () => _dismissReport(report),
+                      child: const Text('Reddet'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => _deleteContent(report),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('İçeriği Sil'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
@@ -287,6 +301,92 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Hata: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _deleteUserAccount(ReportModel report) async {
+     // 1. Fetch Author ID from content
+    String? authorId;
+
+    try {
+      if (report.type == ReportType.confession) {
+        final confession = await _confessionRepo.getConfessionById(report.targetId);
+        authorId = confession?.authorId;
+      } else {
+        if (report.confessionId != null) {
+          final comment = await _commentRepo.getCommentById(report.confessionId!, report.targetId);
+          authorId = comment?.authorId;
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      return;
+    }
+
+    if (authorId == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İçerik sahibi bulunamadı.')));
+      return;
+    }
+
+    if (!mounted) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('KULLANICIYI SİL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Kullanıcı ID: $authorId'),
+            const SizedBox(height: 16),
+            const Text(
+              'Bu işlem GERİ ALINAMAZ!\nKullanıcının hesabı ve tüm verileri kalıcı olarak silinecek.',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true), 
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Evet, Hesabı SİL')
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      // Call Cloud Function
+      try {
+        if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Silme işlemi başlatıldı...')));
+        }
+        
+        final functions = FirebaseFunctions.instanceFor(region: 'europe-west1');
+        final result = await functions.httpsCallable('deleteUserByAdmin').call({
+          'userId': authorId,
+        });
+
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+             content: Text('Başarılı: ${result.data['message']}'),
+             backgroundColor: Colors.green,
+           ));
+        }
+
+        // Optionally perform content cleanup (delete reported content too)
+        // await _deleteContent(report); 
+
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Hata: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ));
+        }
       }
     }
   }

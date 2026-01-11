@@ -280,10 +280,16 @@ async function sendConfessionNotification(confession, confessionId) {
                         createdAt: admin.firestore.FieldValue.serverTimestamp(),
                     });
 
-                    operationCounter++;
+                    // Increment unread count for the user
+                    const userRef = db.collection('users').doc(doc.id);
+                    batch.update(userRef, {
+                        unreadNotificationCount: admin.firestore.FieldValue.increment(1)
+                    });
+
+                    operationCounter += 2; // Two operations per user (Notification Create + User Update)
                     persistedCount++;
 
-                    if (operationCounter === 499) {
+                    if (operationCounter >= 498) { // Batch limit is 500
                         writeBatches.push(batch.commit());
                         batch = db.batch();
                         operationCounter = 0;
@@ -1384,3 +1390,131 @@ exports.shareConfession = onRequest(async (req, res) => {
         res.status(500).send('Sunucu hatası');
     }
 });
+
+// ... (previous code)
+
+/**
+ * Callable function for Admins to delete a user account (Auth + Firestore)
+ */
+exports.deleteUserByAdmin = onCall(
+    {
+        region: 'europe-west1',
+    },
+    async (request) => {
+        // 1. Verify Authentication & Admin Role
+        if (!request.auth) {
+            throw new admin.functions.https.HttpsError(
+                'unauthenticated',
+                'Only authenticated users can call this function.'
+            );
+        }
+
+        // Fetch caller to check if admin/moderator
+        const callerUid = request.auth.uid;
+        const callerDoc = await admin.firestore().collection('users').doc(callerUid).get();
+
+        if (!callerDoc.exists || !callerDoc.data().isModerator) {
+            throw new admin.functions.https.HttpsError(
+                'permission-denied',
+                'Only admins/moderators can delete users.'
+            );
+        }
+
+        // 2. Get User ID to delete
+        const targetUserId = request.data.userId;
+        if (!targetUserId) {
+            throw new admin.functions.https.HttpsError(
+                'invalid-argument',
+                'The function must be called with a "userId" argument.'
+            );
+        }
+
+        console.log(`🗑️ Admin ${callerUid} is deleting user ${targetUserId}`);
+
+        try {
+            // 3. Delete from Firebase Authentication
+            await admin.auth().deleteUser(targetUserId);
+            console.log(`✅ Auth account for ${targetUserId} deleted.`);
+
+            // 4. Delete User Document from Firestore
+            // This will trigger 'onUserDeleted' (if we have one) or we rely on recursive delete extension if installed.
+            // Since we handle content cleanup via separate cascading logic or manual cleanups, 
+            // deleting the user doc is the primary signal.
+            await admin.firestore().collection('users').doc(targetUserId).delete();
+            console.log(`✅ Firestore doc for ${targetUserId} deleted.`);
+
+            return { success: true, message: 'User account deleted successfully.' };
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            // If user not found in Auth (already deleted), try to cleanup Firestore anyway
+            if (error.code === 'auth/user-not-found') {
+                console.log('User not found in Auth, cleaning up Firestore...');
+                await admin.firestore().collection('users').doc(targetUserId).delete();
+                return { success: true, message: 'User updated (Auth was already missing).' };
+            }
+
+            throw new admin.functions.https.HttpsError(
+                'internal',
+                'Failed to delete user.',
+                error
+            );
+        }
+    }
+);
+
+/**
+ * Callable function to batch increment view counts
+ * Designed for "Impression" tracking (lazy list updates)
+ */
+exports.incrementViewCountsBatch = onCall(
+    {
+        region: 'europe-west1',
+    },
+    async (request) => {
+        // 1. Validate Input
+        const confessionIds = request.data.confessionIds;
+        if (!confessionIds || !Array.isArray(confessionIds) || confessionIds.length === 0) {
+            return { success: true, message: 'No IDs provided.' };
+        }
+
+        // Limit batch size per call to prevent abuse (Firestore batch limit is 500)
+        if (confessionIds.length > 500) {
+            throw new admin.functions.https.HttpsError(
+                'invalid-argument',
+                'Too many IDs. Max 500.'
+            );
+        }
+
+        console.log(`👀 Batch incrementing views for ${confessionIds.length} confessions.`);
+
+        const db = admin.firestore();
+        const batch = db.batch();
+        const MAX_BATCH_SIZE = 500;
+
+        let counter = 0;
+
+        confessionIds.forEach((id) => {
+            if (counter < MAX_BATCH_SIZE) {
+                const docRef = db.collection('confessions').doc(id);
+                batch.update(docRef, {
+                    viewCount: admin.firestore.FieldValue.increment(1)
+                });
+                counter++;
+            }
+        });
+
+        try {
+            await batch.commit();
+            console.log(`✅ Successfully incremented ${counter} views.`);
+            return { success: true, count: counter };
+        } catch (error) {
+            // Log specific error
+            console.error('Error batch incrementing views:', error);
+            throw new admin.functions.https.HttpsError(
+                'internal',
+                'Failed to increment views.',
+                error
+            );
+        }
+    }
+);

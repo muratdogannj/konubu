@@ -140,7 +140,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
+    return StreamBuilder<User?>(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
         // Show loading while checking auth state
@@ -152,62 +152,77 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
         
-        // If user is logged in, check premium status and ban status
+        // If user is logged in, listen to their User Model for real-time ban updates
         if (snapshot.hasData) {
           final userId = snapshot.data!.uid;
-          
-          if (!_premiumChecked) {
-            _premiumChecked = true;
-            Future.microtask(() async {
-              final userRepo = UserRepository();
-              final authService = AuthService();
+
+          return StreamBuilder<UserModel?>(
+            stream: UserRepository().getUserStream(userId),
+            builder: (context, userSnapshot) {
+              // If user data is loading (first time), might want to show loading or just passed through
+              // But let's act on data availability.
               
-              // 1. Check Ban Status
-              final user = await userRepo.getUserById(userId);
-              if (user != null && user.isBanned) {
-                if (!context.mounted) return;
+              if (userSnapshot.hasData && userSnapshot.data != null) {
+                final user = userSnapshot.data!;
                 
-                await authService.signOut();
-                
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Hesabınız Yasaklandı'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Görünüşe göre kurallarımızı ihlal ettiğiniz için uzaklaştırıldınız.'),
-                        const SizedBox(height: 16),
-                        if (user.bannedUntil != null)
-                          Text('Bitiş Tarihi: ${user.bannedUntil.toString().split('.')[0]}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        if (user.bannedUntil == null)
-                           const Text('Süre: KALICI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)), 
-                           
-                        if (user.banReason != null) ...[
-                          const SizedBox(height: 8),
-                          Text('Sebep: ${user.banReason}'),
-                        ],
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Tamam, çıkış yap'),
-                      ),
-                    ],
-                  ),
-                );
-                return; // Stop execution (don't check premium)
+                // Real-time Ban Check
+                if (user.isBanned) {
+                  // We need to schedule the sign out to avoid setstate during build
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    if (mounted) {
+                      await _authService.signOut();
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Hesabınız Yasaklandı'),
+                             content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Kurallarımızı ihlal ettiğiniz için uzaklaştırıldınız.'),
+                                const SizedBox(height: 16),
+                                if (user.bannedUntil != null)
+                                  Text('Bitiş: ${user.bannedUntil.toString().split('.')[0]}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                if (user.bannedUntil == null)
+                                   const Text('Süre: KALICI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)), 
+                                   
+                                if (user.banReason != null) ...[
+                                  const SizedBox(height: 8),
+                                  Text('Sebep: ${user.banReason}'),
+                                ],
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context); // Close dialog
+                                  // AuthWrapper will rebuild and show WelcomeScreen since we signed out
+                                },
+                                child: const Text('Tamam'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    }
+                  });
+                  
+                  // While handling ban, return empty container or loading
+                  return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                }
               }
 
-              // 2. Check Premium Status
-              await userRepo.checkAndUpdatePremiumStatus(userId);
-            });
-          }
-          
-          return const HomeScreen();
+              // Also check premium status once if not checked (optional, or keep periodic)
+              if (!_premiumChecked && snapshot.hasData) {
+                 _premiumChecked = true;
+                 UserRepository().checkAndUpdatePremiumStatus(userId);
+              }
+
+              return const HomeScreen();
+            },
+          );
         }
         
         // Reset check flag when user logs out
