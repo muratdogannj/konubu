@@ -833,10 +833,10 @@ Uygulamayı indir:
 $storeUrl
 ''';
 
-    await Share.share(
-      shareText,
-      subject: 'KONUBU - Konu Paylaşımı',
-    );
+      await Share.share(
+        'https://konubu.app/c/${_confession!.id}',
+        subject: 'KONUBU Paylaşımı',
+      );
   }
 
   void _editConfession() {

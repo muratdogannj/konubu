@@ -6,6 +6,11 @@ import 'package:dedikodu_app/features/confession/confession_detail_screen.dart';
 import 'package:dedikodu_app/main.dart'; // To access navigatorKey
 
 class DeepLinkService {
+  // Singleton instance
+  static final DeepLinkService _instance = DeepLinkService._internal();
+  factory DeepLinkService() => _instance;
+  DeepLinkService._internal();
+
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
@@ -13,9 +18,13 @@ class DeepLinkService {
     _appLinks = AppLinks();
 
     // Check initial link (cold start)
-    final initialLink = await _appLinks.getInitialLink();
-    if (initialLink != null) {
-      _handleLink(initialLink);
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) {
+        _handleLink(initialLink);
+      }
+    } catch (e) {
+      debugPrint('Deep Link Initial Access Error: $e');
     }
 
     // Listen to link changes (foreground/background)
@@ -24,7 +33,7 @@ class DeepLinkService {
         _handleLink(uri);
       },
       onError: (err) {
-        debugPrint('Deep Link Error: $err');
+        debugPrint('Deep Link Stream Error: $err');
       },
     );
   }
@@ -32,17 +41,19 @@ class DeepLinkService {
   void _handleLink(Uri uri) {
     debugPrint('Received Deep Link: $uri');
     
-    // Check if scheme matches 'konubu' or if it's a web link (optional)
-    if (uri.scheme == 'konubu' || uri.pathSegments.contains('c')) {
-      // url format: konubu://c/{id}
-      // or https://konubu.com/c/{id}
-      
+    // Check if scheme matches 'konubu' or if it's a web link
+    // Support: konubu://c/{id} AND https://konubu.app/c/{id}
+    bool isValidScheme = uri.scheme == 'konubu' || uri.scheme == 'https' || uri.scheme == 'http';
+    bool hasPath = uri.pathSegments.contains('c');
+
+    if (isValidScheme && hasPath) {
       String? confessionId;
       
-      // Try to extract ID from path segments
+      // Extract ID from path segments
       // Example: /c/123 -> ['c', '123']
-      if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'c') {
-        confessionId = uri.pathSegments[1];
+      int cIndex = uri.pathSegments.indexOf('c');
+      if (cIndex != -1 && cIndex + 1 < uri.pathSegments.length) {
+        confessionId = uri.pathSegments[cIndex + 1];
       }
       
       if (confessionId != null && confessionId.isNotEmpty) {
@@ -52,6 +63,15 @@ class DeepLinkService {
   }
 
   void _navigateToConfession(String confessionId) {
+    debugPrint('Navigating to Confession ID: $confessionId');
+    
+    // Ensure Navigator is ready
+    if (navigatorKey.currentState == null) {
+      debugPrint('Navigator not ready, retrying in 1s...');
+      Future.delayed(const Duration(seconds: 1), () => _navigateToConfession(confessionId));
+      return;
+    }
+
     // Navigate using global key
     navigatorKey.currentState?.push(
       MaterialPageRoute(

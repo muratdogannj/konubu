@@ -1,7 +1,7 @@
 RewriteEngine On
 
 # Handle /c/{id}
-RewriteRule ^c/([a-zA-Z0-9_-]+)$ index.php?id=$1 [L,QSA]
+RewriteRule ^c/([a-zA-Z0-9_-]+)$ share.php?id=$1 [L,QSA]
 
 # Handle /c/ (if index is accessed directly)
-RewriteRule ^c/?$ index.php [L,QSA]
+RewriteRule ^c/?$ share.php [L,QSA]
