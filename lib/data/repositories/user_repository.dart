@@ -388,6 +388,42 @@ class UserRepository {
     }
   }
 
+  // ========== Ban Methods ==========
+
+  /// Ban user for a specific duration or permanently
+  Future<void> banUser(String uid, DateTime? bannedUntil, String reason) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(uid)
+          .update({
+        'bannedUntil': bannedUntil != null ? Timestamp.fromDate(bannedUntil) : null,
+        'banReason': reason,
+      });
+      print('🚫 User $uid banned until $bannedUntil for: $reason');
+    } catch (e) {
+      print('❌ Error banning user: $e');
+      rethrow;
+    }
+  }
+
+  /// Unban user
+  Future<void> unbanUser(String uid) async {
+    try {
+      await _firestore
+          .collection(AppConstants.usersCollection)
+          .doc(uid)
+          .update({
+        'bannedUntil': null,
+        'banReason': null,
+      });
+      print('✅ User $uid unbanned');
+    } catch (e) {
+      print('❌ Error unbanning user: $e');
+      rethrow;
+    }
+  }
+
   // Recalculate and fix user statistics
   Future<void> recalculateUserStats(String uid) async {
     print('🔄 Recalculating stats for user: $uid');

@@ -46,6 +46,15 @@ class UserModel extends Equatable {
   // Dynamic Badge
   final int unreadNotificationCount;
 
+  // Ban System
+  final DateTime? bannedUntil;
+  final String? banReason;
+
+  bool get isBanned {
+    if (bannedUntil == null) return false;
+    return bannedUntil!.isAfter(DateTime.now());
+  }
+
   const UserModel({
     required this.uid,
     this.email,
@@ -78,6 +87,8 @@ class UserModel extends Equatable {
     this.lastMessageReset,
     this.totalMessagesSent = 0,
     this.unreadNotificationCount = 0,
+    this.bannedUntil,
+    this.banReason,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json, String id) {
@@ -127,6 +138,10 @@ class UserModel extends Equatable {
       lastMessageReset: json['lastMessageReset'] as String?,
       totalMessagesSent: (json['totalMessagesSent'] as num?)?.toInt() ?? 0,
       unreadNotificationCount: (json['unreadNotificationCount'] as num?)?.toInt() ?? 0,
+      bannedUntil: json['bannedUntil'] != null
+          ? (json['bannedUntil'] as Timestamp).toDate()
+          : null,
+      banReason: json['banReason'] as String?,
     );
   }
 
@@ -163,6 +178,8 @@ class UserModel extends Equatable {
       'lastMessageReset': lastMessageReset,
       'totalMessagesSent': totalMessagesSent,
       'unreadNotificationCount': unreadNotificationCount,
+      'bannedUntil': bannedUntil != null ? Timestamp.fromDate(bannedUntil!) : null,
+      'banReason': banReason,
     };
   }
 
@@ -198,6 +215,8 @@ class UserModel extends Equatable {
     String? lastMessageReset,
     int? totalMessagesSent,
     int? unreadNotificationCount,
+    DateTime? bannedUntil,
+    String? banReason,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -231,6 +250,8 @@ class UserModel extends Equatable {
       lastMessageReset: lastMessageReset ?? this.lastMessageReset,
       totalMessagesSent: totalMessagesSent ?? this.totalMessagesSent,
       unreadNotificationCount: unreadNotificationCount ?? this.unreadNotificationCount,
+      bannedUntil: bannedUntil ?? this.bannedUntil,
+      banReason: banReason ?? this.banReason,
     );
   }
 
@@ -266,5 +287,7 @@ class UserModel extends Equatable {
         lastMessageReset,
         totalMessagesSent,
         unreadNotificationCount,
+        bannedUntil,
+        banReason,
       ];
 }

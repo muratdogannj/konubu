@@ -1,14 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:dedikodu_app/core/theme/app_theme.dart';
-import 'package:dedikodu_app/data/models/report_model.dart';
-import 'package:dedikodu_app/data/models/confession_model.dart';
-import 'package:dedikodu_app/data/models/comment_model.dart';
-import 'package:dedikodu_app/data/repositories/report_repository.dart';
-import 'package:dedikodu_app/data/repositories/confession_repository.dart';
-import 'package:dedikodu_app/data/repositories/comment_repository.dart';
-import 'package:dedikodu_app/features/confession/confession_detail_screen.dart';
-import 'package:dedikodu_app/core/theme/app_theme.dart';
-import 'package:timeago/timeago.dart' as timeago;
+import 'package:dedikodu_app/data/repositories/user_repository.dart';
+import 'package:dedikodu_app/features/admin/widgets/ban_user_dialog.dart';
 
 class AdminReportsTab extends StatefulWidget {
   const AdminReportsTab({super.key});
@@ -21,8 +12,96 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
   final _reportRepo = ReportRepository();
   final _confessionRepo = ConfessionRepository();
   final _commentRepo = CommentRepository();
+  final _userRepo = UserRepository();
   
   ReportStatus _filterStatus = ReportStatus.pending;
+
+  // ... (build method remains same until actions)
+
+// ... INSIDE _buildReportCard ACTIONS ROW ...
+            // Actions (Only for pending reports)
+            if (report.status == ReportStatus.pending) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                   OutlinedButton.icon(
+                    onPressed: () => _banUser(report),
+                    icon: const Icon(Icons.block, size: 16, color: Colors.orange),
+                    label: const Text('Yasakla', style: TextStyle(color: Colors.orange)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.orange)),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => _dismissReport(report),
+                    child: const Text('Reddet'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _deleteContent(report),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('İçeriği Sil'),
+                  ),
+                ],
+              ),
+            ],
+// ...
+
+  Future<void> _banUser(ReportModel report) async {
+    // 1. Fetch Author ID from content
+    String? authorId;
+    String? contentSnippet;
+
+    try {
+      if (report.type == ReportType.confession) {
+        final confession = await _confessionRepo.getConfessionById(report.targetId);
+        authorId = confession?.authorId;
+        contentSnippet = confession?.content;
+      } else {
+        if (report.confessionId != null) {
+          final comment = await _commentRepo.getCommentById(report.confessionId!, report.targetId);
+          authorId = comment?.authorId;
+          contentSnippet = comment?.content;
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata: $e')));
+      return;
+    }
+
+    if (authorId == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İçerik sahibi bulunamadı (Silinmiş olabilir).')));
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 2. Show Ban Dialog
+    showDialog(
+      context: context,
+      builder: (context) => BanUserDialog(
+        userName: 'Kullanıcı ($authorId)', // Ideally fetch username too but ID is safer for uniqueness
+        onConfirm: (bannedUntil, reason) async {
+          // 3. Execute Ban
+           try {
+             await _userRepo.banUser(authorId!, bannedUntil, reason);
+             if (mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text('Kullanıcı yasaklandı (Bitiş: ${bannedUntil?.toString() ?? "Kalıcı"})')),
+               );
+             }
+           } catch (e) {
+             if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ban hatası: $e')));
+           }
+        },
+      ),
+    );
+  }
+
+  Future<void> _dismissReport(ReportModel report) async {
 
   @override
   Widget build(BuildContext context) {

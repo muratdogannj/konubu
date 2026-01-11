@@ -15,6 +15,7 @@ import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:dedikodu_app/core/services/deep_link_service.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 
+import 'package:dedikodu_app/core/services/ad_service.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -68,6 +69,13 @@ void main() async {
       await DeepLinkService().initialize();
     } catch (e) {
       debugPrint('Deep Link Init Error: $e');
+    }
+    
+    // Initialize AdMob
+    try {
+      await AdService.initialize();
+    } catch (e) {
+      debugPrint('AdMob Init Error: $e');
     }
   });
 }
@@ -144,16 +152,57 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
         
-        // If user is logged in, check premium status and show home screen
+        // If user is logged in, check premium status and ban status
         if (snapshot.hasData) {
           final userId = snapshot.data!.uid;
           
-          // Check premium status once per session
           if (!_premiumChecked) {
             _premiumChecked = true;
-            // Run premium check asynchronously
             Future.microtask(() async {
               final userRepo = UserRepository();
+              final authService = AuthService();
+              
+              // 1. Check Ban Status
+              final user = await userRepo.getUserById(userId);
+              if (user != null && user.isBanned) {
+                if (!context.mounted) return;
+                
+                await authService.signOut();
+                
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Hesabınız Yasaklandı'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Görünüşe göre kurallarımızı ihlal ettiğiniz için uzaklaştırıldınız.'),
+                        const SizedBox(height: 16),
+                        if (user.bannedUntil != null)
+                          Text('Bitiş Tarihi: ${user.bannedUntil.toString().split('.')[0]}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        if (user.bannedUntil == null)
+                           const Text('Süre: KALICI', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)), 
+                           
+                        if (user.banReason != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Sebep: ${user.banReason}'),
+                        ],
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Tamam, çıkış yap'),
+                      ),
+                    ],
+                  ),
+                );
+                return; // Stop execution (don't check premium)
+              }
+
+              // 2. Check Premium Status
               await userRepo.checkAndUpdatePremiumStatus(userId);
             });
           }
@@ -161,7 +210,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const HomeScreen();
         }
         
-        // Reset premium check flag when user logs out
+        // Reset check flag when user logs out
         _premiumChecked = false;
         
         // Otherwise show welcome screen
